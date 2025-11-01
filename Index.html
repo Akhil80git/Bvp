@@ -1,110 +1,98 @@
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>School Location Checker</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; padding:18px; max-width:900px; margin:auto; }
-h1 { font-size:20px; margin-bottom:6px; }
-.card { border:1px solid #ddd; padding:14px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.03); margin-bottom:12px; }
-label { display:block; margin-top:8px; font-weight:600; }
-input[type="number"] { width:100%; padding:6px; margin-top:4px; box-sizing:border-box; border-radius:6px; border:1px solid #ccc; }
-button { margin-top:6px; padding:6px 10px; border-radius:6px; border:none; cursor:pointer; background:#1473e6; color:white; }
-.small { font-size:13px; color:#555; margin-top:6px; }
-.ok { color:green; font-weight:700; }
-.no { color:red; font-weight:700; }
-.row { display:flex; gap:8px; margin-top:6px; align-items:center; }
-.col { flex:1; }
-.center-button { background:#22a; }
-pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin-top:8px; }
-#userCoords { margin-top:8px; font-weight:600; color:#1473e6; }
-#insideSection { display:none; padding:40px; text-align:center; font-size:20px; border:2px solid #1473e6; border-radius:12px; margin-top:20px; background:#f0f8ff; }
-#insideSection span { display:block; margin-top:12px; font-size:18px; color:#000; }
+:root{--blue:#1473e6;--green:#22a;--red:#dc3545;--muted:#555}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;padding:16px;max-width:980px;margin:auto}
+h1{font-size:20px;margin:6px 0}
+.card{border:1px solid #ddd;padding:12px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.03);margin-bottom:12px}
+label{display:block;margin-top:8px;font-weight:600}
+input[type=number]{width:100%;padding:6px;margin-top:4px;box-sizing:border-box;border-radius:6px;border:1px solid #ccc}
+button{margin-top:6px;padding:8px 10px;border-radius:6px;border:0;cursor:pointer;background:var(--blue);color:#fff}
+.small{font-size:13px;color:var(--muted);margin-top:6px}
+.ok{color:green;font-weight:700}
+.no{color:red;font-weight:700}
+.row{display:flex;gap:8px;margin-top:6px;align-items:center}
+.col{flex:1}
+.center-button{background:var(--green)}
+pre{background:#f7f7f7;padding:10px;border-radius:6px;overflow:auto;margin-top:8px}
+#userCoords{margin-top:8px;font-weight:600;color:var(--blue)}
+#insideSection{display:none;padding:28px;text-align:center;font-size:18px;border:2px solid var(--blue);border-radius:12px;margin-top:16px;background:#f0f8ff}
+#insideSection span{display:block;margin-top:8px;font-size:15px;color:#000}
 
-/* Accuracy indicator styles */
-#gpsAccuracy { margin-top:8px; font-size:13px; color:#555; }
-.progress { height:6px; background:#f1f1f1; border-radius:3px; margin-top:8px; overflow:hidden; }
-.progress-bar { height:100%; background:#1473e6; border-radius:3px; width:0%; transition:width 0.5s; }
-.accuracy-info { display:flex; justify-content:space-between; font-size:12px; color:#555; margin-top:4px; }
-.accuracy-high { color:green; }
-.accuracy-medium { color:orange; }
-.accuracy-low { color:red; }
-.loading { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-radius:50%; border-top-color:#fff; animation:spin 1s linear infinite; margin-right:6px; vertical-align:middle; }
-@keyframes spin { to { transform:rotate(360deg); } }
+/* Accuracy */
+#gpsAccuracy{margin-top:8px;font-size:13px;color:var(--muted);display:none}
+.progress{height:6px;background:#f1f1f1;border-radius:3px;margin-top:8px;overflow:hidden}
+.progress-bar{height:100%;background:var(--blue);border-radius:3px;width:0%;transition:width .4s}
+.accuracy-info{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+.accuracy-high{color:green}
+.accuracy-medium{color:orange}
+.accuracy-low{color:red}
+.loading{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin 1s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* Map styles */
-#mapContainer { display:none; height:400px; margin-top:20px; border-radius:8px; overflow:hidden; border:1px solid #ddd; }
-#mapToggle { background:#28a745; margin-top:10px; }
-#mapToggle.hide { background:#dc3545; }
-.map-legend { position:absolute; bottom:20px; right:20px; background:white; padding:10px; border-radius:5px; box-shadow:0 0 10px rgba(0,0,0,0.2); z-index:1000; font-size:12px; }
-.legend-item { display:flex; align-items:center; margin-bottom:5px; }
-.legend-color { width:15px; height:15px; margin-right:8px; border-radius:3px; }
+/* Map */
+#mapContainer{display:none;height:400px;margin-top:12px;border-radius:8px;overflow:hidden;border:1px solid #ddd}
+#mapToggle{background:#28a745;margin-top:8px}
+#mapToggle.hide{background:var(--red)}
+@media(max-width:600px){body{padding:10px}}
 </style>
 </head>
 <body>
-
 <div id="mainSection">
-<h1>School Location Checker</h1>
+  <h1>School Location Checker</h1>
 
-<div class="card">
-  <strong>Current / Manual Location:</strong>
-  <div id="status" class="small">Ready — "Use current location" दबाएँ या manual location set करें।</div>
-  <button id="btnUseCurrent">
-    <span id="gpsLoading" class="loading" style="display:none;"></span>
-    📍 Use current location (GPS)
-  </button>
-  <button id="btnManualSet">🖊️ Set Manual Location</button>
-  
-  <div id="gpsAccuracy" style="display:none;">
-    <div class="accuracy-info">
-      <span>Accuracy:</span>
-      <span id="accuracyValue"></span>
+  <div class="card">
+    <strong>Current / Manual Location:</strong>
+    <div id="status" class="small">Ready — "Use current location" दबाएँ या manual location set करें।</div>
+    <button id="btnUseCurrent">
+      <span id="gpsLoading" class="loading" style="display:none"></span>
+      📍 Use current location (GPS)
+    </button>
+    <button id="btnManualSet">🖊️ Set Manual Location</button>
+
+    <div id="gpsAccuracy">
+      <div class="accuracy-info"><span>Accuracy:</span><span id="accuracyValue"></span></div>
+      <div class="progress"><div id="accuracyBar" class="progress-bar"></div></div>
+      <div class="accuracy-info"><span>Poor</span><span>Good</span><span>Excellent</span></div>
     </div>
-    <div class="progress">
-      <div id="accuracyBar" class="progress-bar"></div>
+
+    <div id="manualInputs" style="margin-top:10px">
+      <label>Latitude:</label>
+      <input type="number" id="manualLat" step="any" placeholder="e.g., 24.6832581">
+      <label>Longitude:</label>
+      <input type="number" id="manualLon" step="any" placeholder="e.g., 80.5419671">
     </div>
-    <div class="accuracy-info">
-      <span>Poor</span>
-      <span>Good</span>
-      <span>Excellent</span>
-    </div>
+    <div id="manualStatus" class="small"></div>
+    <div id="userCoords"></div>
   </div>
-  
-  <div id="manualInputs" style="margin-top:10px;">
-    <label>Latitude:</label>
-    <input type="number" id="manualLat" step="any" placeholder="e.g., 24.6832581">
-    <label>Longitude:</label>
-    <input type="number" id="manualLon" step="any" placeholder="e.g., 80.5419671">
+
+  <div class="card">
+    <strong>School Locations (radius editable):</strong>
+    <div id="centersContainer" style="margin-top:8px"></div>
   </div>
-  <div id="manualStatus" class="small"></div>
-  <div id="userCoords"></div>
+
+  <div class="card">
+    <strong>Results:</strong>
+    <div id="searchResult" class="small" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <strong>Live Map:</strong>
+    <button id="mapToggle">🗺️ Show Live Map</button>
+    <div id="mapContainer"></div>
+  </div>
+
+  <div class="card">
+    <strong>Debug:</strong>
+    <pre id="debug">Ready.</pre>
+  </div>
 </div>
 
-<div class="card">
-  <strong>School Locations (radius editable):</strong>
-  <div id="centersContainer" style="margin-top:8px;"></div>
-</div>
-
-<div class="card">
-  <strong>Results:</strong>
-  <div id="searchResult" class="small" style="margin-top:4px;"></div>
-</div>
-
-<div class="card">
-  <strong>Live Map:</strong>
-  <button id="mapToggle">🗺️ Show Live Map</button>
-  <div id="mapContainer"></div>
-</div>
-
-<div class="card">
-  <strong>Debug:</strong>
-  <pre id="debug">Ready.</pre>
-</div>
-</div>
-
-<!-- Inside Section -->
 <div id="insideSection">
   <strong>आप इस school के अंदर हैं! 😊</strong>
   <span id="insideUser">User: </span>
@@ -116,450 +104,178 @@ pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// --- Utility Functions ---
-function haversineKm(lat1, lon1, lat2, lon2){
-  const R=6371;
-  const toRad=deg=>deg*Math.PI/180;
-  const dLat=toRad(lat2-lat1);
-  const dLon=toRad(lon2-lon1);
-  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-  return R*c;
-}
+/* ---------- Utilities ---------- */
+function haversineKm(a,b,c,d){const R=6371;const toRad=e=>e*Math.PI/180;const dLat=toRad(c-a);const dLon=toRad(d-b);const aa=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2;const cc=2*Math.atan2(Math.sqrt(aa),Math.sqrt(1-aa));return R*cc;}
 
-// Driving distance via OSRM API
-async function getDrivingDistance(lat1, lon1, lat2, lon2) {
-  const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false&steps=true`;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network error');
-    const data = await response.json();
-    if (data.code === 'Ok' && data.routes.length > 0) {
-      return data.routes[0].distance / 1000;
-    } else {
-      throw new Error('No route found');
-    }
-  } catch (error) {
-    console.error('Error fetching driving distance:', error);
-    return haversineKm(lat1, lon1, lat2, lon2);
+async function getDrivingDistance(lat1,lon1,lat2,lon2){
+  const url=`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false&steps=true`;
+  try{
+    const r=await fetch(url);
+    if(!r.ok) throw new Error('Network');
+    const d=await r.json();
+    if(d.code==='Ok'&&d.routes&&d.routes.length) return d.routes[0].distance/1000;
+    throw new Error('No route');
+  }catch(e){
+    console.error('driving error',e);
+    return haversineKm(lat1,lon1,lat2,lon2);
   }
 }
 
-// Get route geometry from OSRM
-async function getRouteGeometry(lat1, lon1, lat2, lon2) {
-  const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Network error');
-    const data = await response.json();
-    if (data.code === 'Ok' && data.routes.length > 0) {
-      return data.routes[0].geometry;
-    } else {
-      throw new Error('No route found');
-    }
-  } catch (error) {
-    console.error('Error fetching route geometry:', error);
+async function getRouteGeometry(lat1,lon1,lat2,lon2){
+  const url=`https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+  try{
+    const r=await fetch(url);
+    if(!r.ok) throw new Error('Network');
+    const d=await r.json();
+    if(d.code==='Ok'&&d.routes&&d.routes.length) return d.routes[0].geometry;
+    throw new Error('No route');
+  }catch(e){
+    console.error('route geometry error',e);
     return null;
   }
 }
 
-// --- DOM Refs ---
-const statusEl=document.getElementById('status');
-const manualStatus=document.getElementById('manualStatus');
+/* ---------- DOM Refs ---------- */
+const statusEl=document.getElementById('status'), manualStatus=document.getElementById('manualStatus');
 const centersContainer=document.getElementById('centersContainer');
-const btnUseCurrent=document.getElementById('btnUseCurrent');
-const btnManualSet=document.getElementById('btnManualSet');
-const searchResultEl=document.getElementById('searchResult');
-const debugEl=document.getElementById('debug');
-const userCoordsEl=document.getElementById('userCoords');
-const insideSection=document.getElementById('insideSection');
-const insideUser=document.getElementById('insideUser');
-const insideSchool1=document.getElementById('insideSchool1');
-const insideSchool2=document.getElementById('insideSchool2');
-const distanceUserSchool1=document.getElementById('distanceUserSchool1');
+const btnUseCurrent=document.getElementById('btnUseCurrent'), btnManualSet=document.getElementById('btnManualSet');
+const searchResultEl=document.getElementById('searchResult'), debugEl=document.getElementById('debug');
+const userCoordsEl=document.getElementById('userCoords'), insideSection=document.getElementById('insideSection');
+const insideUser=document.getElementById('insideUser'), insideSchool1=document.getElementById('insideSchool1');
+const insideSchool2=document.getElementById('insideSchool2'), distanceUserSchool1=document.getElementById('distanceUserSchool1');
 const distanceUserSchool2=document.getElementById('distanceUserSchool2');
-const gpsAccuracyEl=document.getElementById('gpsAccuracy');
-const accuracyValueEl=document.getElementById('accuracyValue');
-const accuracyBarEl=document.getElementById('accuracyBar');
-const gpsLoadingEl=document.getElementById('gpsLoading');
-const mapContainer=document.getElementById('mapContainer');
-const mapToggle=document.getElementById('mapToggle');
+const gpsLoadingEl=document.getElementById('gpsLoading'), gpsAccuracyEl=document.getElementById('gpsAccuracy');
+const accuracyValueEl=document.getElementById('accuracyValue'), accuracyBarEl=document.getElementById('accuracyBar');
+const mapContainer=document.getElementById('mapContainer'), mapToggle=document.getElementById('mapToggle');
 
-let userLat=null, userLon=null;
-let watchId=null;
-let bestAccuracy=Infinity;
-let bestCoords=null;
+let userLat=null,userLon=null,watchId=null,bestAccuracy=Infinity,bestCoords=null;
+let map=null,userMarker=null,schoolMarkers=[],routeLayers=[],liveTracking=false,mapWatchId=null;
 
-// Map variables
-let map = null;
-let userMarker = null;
-let userPath = null;
-let schoolMarkers = [];
-let routeLayers = [];
-let liveTracking = false;
-let mapWatchId = null;
-
-// --- School Centers ---
+/* ---------- Centers ---------- */
 let centers=[
-  {name:'Sarasvati School', lat:24.6832581, lon:80.5419671, radius:1},
-  {name:'Government School', lat:24.6835231, lon:80.5439499, radius:1}
+  {name:'Sarasvati School',lat:24.6832581,lon:80.5419671,radius:1},
+  {name:'Government School',lat:24.6835231,lon:80.5439499,radius:1}
 ];
 
-// --- Render Centers ---
 function renderCenters(){
   centersContainer.innerHTML='';
   centers.forEach((c,i)=>{
-    const row=document.createElement('div');
-    row.className='row';
-    row.innerHTML=`
-      <div class="col"><strong>${c.name}</strong></div>
+    const row=document.createElement('div');row.className='row';
+    row.innerHTML=`<div class="col"><strong>${c.name}</strong></div>
       <div class="col"><input type="number" step="0.1" data-index="${i}" class="centerRadius" value="${c.radius}" placeholder="Radius (km)"></div>
-      <div class="col"><button class="center-button" data-index="${i}">Check</button></div>
-    `;
+      <div class="col"><button class="center-button" data-index="${i}">Check</button></div>`;
     centersContainer.appendChild(row);
   });
   document.querySelectorAll('.center-button').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const idx=parseInt(btn.getAttribute('data-index'));
-      updateCentersFromInput();
-      if(userLat===null || userLon===null){
-        alert('Please set current or manual location first.');
-        return;
-      }
-      await checkInside(userLat, userLon, centers[idx]);
+    btn.addEventListener('click',async ()=>{
+      const idx=+btn.getAttribute('data-index'); updateCentersFromInput();
+      if(userLat==null||userLon==null){alert('Please set current or manual location first.');return;}
+      await checkInside(userLat,userLon,centers[idx]);
     });
   });
 }
-function updateCentersFromInput(){
-  document.querySelectorAll('.centerRadius').forEach(inp=>{
-    const idx=parseInt(inp.getAttribute('data-index'));
-    const val=parseFloat(inp.value);
-    if(!isNaN(val)) centers[idx].radius=val;
-  });
-}
+function updateCentersFromInput(){document.querySelectorAll('.centerRadius').forEach(inp=>{const idx=+inp.getAttribute('data-index');const val=parseFloat(inp.value);if(!isNaN(val))centers[idx].radius=val;});}
 renderCenters();
 
-// --- Map Functions ---
-function initMap() {
-  if (map) return;
-  
-  map = L.map('mapContainer').setView([24.6832581, 80.5419671], 15);
-  
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
-  
-  // Add school markers with different colors
-  const sarasvatiMarker = L.marker([centers[0].lat, centers[0].lon])
-    .addTo(map)
-    .bindPopup(`<b>${centers[0].name}</b><br>Radius: ${centers[0].radius} km`);
-  
-  const govtMarker = L.marker([centers[1].lat, centers[1].lon])
-    .addTo(map)
-    .bindPopup(`<b>${centers[1].name}</b><br>Radius: ${centers[1].radius} km`);
-  
-  schoolMarkers.push(sarasvatiMarker, govtMarker);
-  
-  // Add radius circles
-  L.circle([centers[0].lat, centers[0].lon], {
-    color: 'red',
-    fillColor: '#ff0000',
-    fillOpacity: 0.1,
-    radius: centers[0].radius * 1000
-  }).addTo(map);
-  
-  L.circle([centers[1].lat, centers[1].lon], {
-    color: 'pink',
-    fillColor: '#ff69b4',
-    fillOpacity: 0.1,
-    radius: centers[1].radius * 1000
-  }).addTo(map);
-  
-  // Add legend
-  const legend = L.control({position: 'bottomright'});
-  legend.onAdd = function(map) {
-    const div = L.DomUtil.create('div', 'map-legend');
-    div.innerHTML = `
-      <div class="legend-item"><div class="legend-color" style="background-color:green"></div>User Path</div>
-      <div class="legend-item"><div class="legend-color" style="background-color:red"></div>Sarasvati School Route</div>
-      <div class="legend-item"><div class="legend-color" style="background-color:pink"></div>Government School Route</div>
-    `;
-    return div;
-  };
-  legend.addTo(map);
-}
-
-function updateUserMarker(lat, lon, accuracy) {
-  if (!map) return;
-  
-  // Remove existing user marker
-  if (userMarker) {
-    map.removeLayer(userMarker);
-  }
-  
-  // Add new user marker with accuracy circle
-  userMarker = L.marker([lat, lon])
-    .addTo(map)
-    .bindPopup(`<b>Your Location</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`)
-    .openPopup();
-  
-  // Add accuracy circle
-  if (accuracy) {
-    L.circle([lat, lon], {
-      color: 'green',
-      fillColor: '#00ff00',
-      fillOpacity: 0.2,
-      radius: accuracy
-    }).addTo(map);
-  }
-  
-  // Update user path
-  if (liveTracking) {
-    if (!userPath) {
-      userPath = L.polyline([[lat, lon]], {color: 'green', weight: 5}).addTo(map);
-    } else {
-      const currentPath = userPath.getLatLngs();
-      currentPath.push([lat, lon]);
-      userPath.setLatLngs(currentPath);
-    }
-  }
-  
-  // Update map view to show user and schools
-  const bounds = L.latLngBounds([[lat, lon]]);
-  schoolMarkers.forEach(marker => {
-    bounds.extend(marker.getLatLng());
+/* ---------- Map ---------- */
+function initMap(){
+  if(map) return;
+  map=L.map('mapContainer').setView([24.6832581,80.5419671],15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+  centers.forEach(center=>{
+    const m=L.marker([center.lat,center.lon]).addTo(map).bindPopup(`<b>${center.name}</b><br>Radius: ${center.radius} km`);
+    schoolMarkers.push(m);
+    L.circle([center.lat,center.lon],{color:'blue',fillColor:'#3388ff',fillOpacity:0.08,radius:center.radius*1000}).addTo(map);
   });
-  map.fitBounds(bounds, { padding: [20, 20] });
 }
 
-async function updateRoutes(lat, lon) {
-  if (!map) return;
-  
-  // Remove existing routes
-  routeLayers.forEach(layer => {
-    map.removeLayer(layer);
-  });
-  routeLayers = [];
-  
-  // Add routes to each school with different colors
-  for (let i = 0; i < centers.length; i++) {
-    const center = centers[i];
-    const geometry = await getRouteGeometry(lat, lon, center.lat, center.lon);
-    
-    if (geometry) {
-      const routeColor = i === 0 ? 'red' : 'pink';
-      const routeLayer = L.geoJSON(geometry, {
-        style: {
-          color: routeColor,
-          weight: 4,
-          opacity: 0.7
-        }
-      }).addTo(map);
-      
-      routeLayers.push(routeLayer);
-    }
+function updateUserMarker(lat,lon,accuracy){
+  if(!map) return;
+  if(userMarker){map.removeLayer(userMarker);}
+  userMarker=L.marker([lat,lon]).addTo(map).bindPopup(`<b>Your Location</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`).openPopup();
+  if(accuracy){L.circle([lat,lon],{color:'red',fillColor:'#f03',fillOpacity:0.15,radius:accuracy}).addTo(map);}
+  const bounds=L.latLngBounds([[lat,lon]]);
+  schoolMarkers.forEach(m=>bounds.extend(m.getLatLng()));
+  map.fitBounds(bounds,{padding:[20,20]});
+}
+
+async function updateRoutes(lat,lon){
+  if(!map) return;
+  routeLayers.forEach(l=>map.removeLayer(l)); routeLayers=[];
+  for(let i=0;i<centers.length;i++){
+    const g=await getRouteGeometry(lat,lon,centers[i].lat,centers[i].lon);
+    if(g){const layer=L.geoJSON(g,{style:{color:'red',weight:4,opacity:0.7}}).addTo(map);routeLayers.push(layer);}
   }
 }
 
-function toggleMap() {
-  if (mapContainer.style.display === 'none') {
-    mapContainer.style.display = 'block';
-    mapToggle.textContent = '🗺️ Hide Live Map';
-    mapToggle.classList.add('hide');
-    
-    if (!map) {
-      initMap();
-    }
-    
-    if (userLat && userLon) {
-      updateUserMarker(userLat, userLon, bestAccuracy);
-      updateRoutes(userLat, userLon);
-    }
-    
-    // Start live tracking if GPS is active
-    if (liveTracking) {
-      startMapTracking();
-    }
-  } else {
-    mapContainer.style.display = 'none';
-    mapToggle.textContent = '🗺️ Show Live Map';
-    mapToggle.classList.remove('hide');
-    
-    // Stop live tracking
-    if (mapWatchId !== null) {
-      navigator.geolocation.clearWatch(mapWatchId);
-      mapWatchId = null;
-    }
-  }
+function toggleMap(){
+  if(mapContainer.style.display==='none'){mapContainer.style.display='block';mapToggle.textContent='🗺️ Hide Live Map';mapToggle.classList.add('hide');if(!map) initMap(); if(userLat&&userLon){updateUserMarker(userLat,userLon,bestAccuracy);updateRoutes(userLat,userLon);} if(liveTracking) startMapTracking();}
+  else{mapContainer.style.display='none';mapToggle.textContent='🗺️ Show Live Map';mapToggle.classList.remove('hide'); if(mapWatchId!==null){navigator.geolocation.clearWatch(mapWatchId);mapWatchId=null;}}
 }
 
-function startMapTracking() {
-  if (!navigator.geolocation || !map) return;
-  
-  if (mapWatchId !== null) {
-    navigator.geolocation.clearWatch(mapWatchId);
-  }
-  
-  mapWatchId = navigator.geolocation.watchPosition(
-    pos => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      const accuracy = pos.coords.accuracy;
-      
-      updateUserMarker(lat, lon, accuracy);
-      updateRoutes(lat, lon);
-      
-      // Update user coordinates display
-      userCoordsEl.textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lon.toFixed(6)}`;
-    },
-    err => {
-      console.error('Map tracking error:', err);
-    },
-    { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-  );
+function startMapTracking(){
+  if(!navigator.geolocation||!map) return;
+  if(mapWatchId!==null) navigator.geolocation.clearWatch(mapWatchId);
+  mapWatchId=navigator.geolocation.watchPosition(pos=>{
+    const lat=pos.coords.latitude, lon=pos.coords.longitude, accuracy=pos.coords.accuracy;
+    updateUserMarker(lat,lon,accuracy);
+    updateRoutes(lat,lon);
+    userCoordsEl.textContent=`Latitude: ${lat.toFixed(6)}, Longitude: ${lon.toFixed(6)}`;
+  },err=>console.error('Map tracking error:',err),{enableHighAccuracy:true,maximumAge:10000,timeout:15000});
 }
 
-// --- 5 Second Optimized GPS ---
-btnUseCurrent.addEventListener('click', ()=>{
-  statusEl.textContent='📡 GPS से location ली जा रही है...';
-  gpsLoadingEl.style.display = 'inline-block';
-  gpsAccuracyEl.style.display = 'block';
-
-  if(!navigator.geolocation){
-    statusEl.textContent='❌ Browser geolocation supported नहीं है। कृपया manual location set करें।';
-    gpsLoadingEl.style.display = 'none';
-    highlightManual();
-    return;
-  }
-
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-  bestAccuracy = Infinity;
-  bestCoords = null;
-
-  watchId = navigator.geolocation.watchPosition(
-    pos => {
-      const accuracy = pos.coords.accuracy;
-
-      // Better accuracy filter
-      if (accuracy < bestAccuracy) {
-        bestAccuracy = accuracy;
-        bestCoords = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: accuracy
-        };
-      }
-
-      accuracyValueEl.textContent = `±${accuracy.toFixed(1)} meters`;
-      accuracyValueEl.className = '';
-      if (accuracy <= 3) {
-        accuracyValueEl.classList.add('accuracy-high');
-        accuracyBarEl.style.width = '100%';
-      } else if (accuracy <= 10) {
-        accuracyValueEl.classList.add('accuracy-medium');
-        accuracyBarEl.style.width = '80%';
-      } else {
-        accuracyValueEl.classList.add('accuracy-low');
-        accuracyBarEl.style.width = '50%';
-      }
-    },
-    err => {
-      statusEl.textContent='❌ GPS error: '+err.message+' — कृपया manual location set करें।';
-      gpsLoadingEl.style.display = 'none';
-      highlightManual();
-    },
-    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-  );
-
-  // Stop after 5 seconds
-  setTimeout(() => {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-      gpsLoadingEl.style.display = 'none';
-      if (bestCoords) {
-        userLat = bestCoords.latitude;
-        userLon = bestCoords.longitude;
-        statusEl.textContent='✅ GPS location set (5s optimized).';
-        accuracyValueEl.textContent = `±${bestAccuracy.toFixed(1)} meters`;
-        userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
-        debugEl.textContent=`Final coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
-        
-        // Enable live tracking
-        liveTracking = true;
-        
-        // Update map if visible
-        if (mapContainer.style.display !== 'none') {
-          updateUserMarker(userLat, userLon, bestAccuracy);
-          updateRoutes(userLat, userLon);
-          startMapTracking();
-        }
-      } else {
-        statusEl.textContent='❌ 5 seconds में location नहीं मिली। कृपया manual set करें।';
-        highlightManual();
-      }
-    }
-  }, 5000);
+/* ---------- GPS 5s Optimized ---------- */
+btnUseCurrent.addEventListener('click',()=>{
+  statusEl.textContent='📡 GPS से location ली जा रही है...'; gpsLoadingEl.style.display='inline-block'; gpsAccuracyEl.style.display='block';
+  if(!navigator.geolocation){statusEl.textContent='❌ Browser geolocation supported नहीं है। कृपया manual location set करें।';gpsLoadingEl.style.display='none';highlightManual();return;}
+  if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+  bestAccuracy=Infinity; bestCoords=null;
+  watchId=navigator.geolocation.watchPosition(pos=>{
+    const accuracy=pos.coords.accuracy;
+    if(accuracy<bestAccuracy){bestAccuracy=accuracy;bestCoords={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy}};
+    accuracyValueEl.textContent=`±${accuracy.toFixed(1)} meters`;accuracyValueEl.className='';
+    if(accuracy<=3){accuracyValueEl.classList.add('accuracy-high');accuracyBarEl.style.width='100%';}
+    else if(accuracy<=10){accuracyValueEl.classList.add('accuracy-medium');accuracyBarEl.style.width='80%';}
+    else{accuracyValueEl.classList.add('accuracy-low');accuracyBarEl.style.width='50%';}
+  },err=>{statusEl.textContent='❌ GPS error: '+err.message+' — कृपया manual location set करें।';gpsLoadingEl.style.display='none';highlightManual();},{enableHighAccuracy:true,timeout:5000,maximumAge:0});
+  setTimeout(()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;gpsLoadingEl.style.display='none';if(bestCoords){userLat=bestCoords.latitude;userLon=bestCoords.longitude;statusEl.textContent='✅ GPS location set (5s optimized).';accuracyValueEl.textContent=`±${bestAccuracy.toFixed(1)} meters`;userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;debugEl.textContent=`Final coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;liveTracking=true; if(mapContainer.style.display!=='none'){updateUserMarker(userLat,userLon,bestAccuracy);updateRoutes(userLat,userLon);startMapTracking();}}else{statusEl.textContent='❌ 5 seconds में location नहीं मिली। कृपया manual set करें।';highlightManual();}}},5000);
 });
 
-// Highlight manual input
-function highlightManual(){
-  document.getElementById('manualInputs').style.border='2px dashed red';
-  manualStatus.textContent='👉 GPS fail हुआ, कृपया यहां Latitude और Longitude डालें।';
-  window.scrollTo({top: document.getElementById('manualInputs').offsetTop-20, behavior:'smooth'});
-}
-
-// Manual location set
-btnManualSet.addEventListener('click', ()=>{
-  const lat=parseFloat(document.getElementById('manualLat').value);
-  const lon=parseFloat(document.getElementById('manualLon').value);
-  if(isNaN(lat)||isNaN(lon)){
-    manualStatus.textContent='❌ Invalid input!';
-    return;
-  }
-  userLat=lat; userLon=lon;
-  manualStatus.textContent='✅ Manual location set हो गई।';
-  statusEl.textContent='✅ Manual location set.';
-  userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
-  debugEl.textContent=`User coords: ${userLat}, ${userLon}`;
-  gpsAccuracyEl.style.display='none';
-  
-  // Disable live tracking for manual locations
-  liveTracking = false;
-  
-  // Update map if visible
-  if (mapContainer.style.display !== 'none') {
-    updateUserMarker(userLat, userLon);
-    updateRoutes(userLat, userLon);
-  }
+/* ---------- Manual ---------- */
+btnManualSet.addEventListener('click',()=>{
+  const lat=parseFloat(document.getElementById('manualLat').value), lon=parseFloat(document.getElementById('manualLon').value);
+  if(isNaN(lat)||isNaN(lon)){manualStatus.textContent='❌ Invalid input!'; return;}
+  userLat=lat; userLon=lon; manualStatus.textContent='✅ Manual location set हो गई।'; statusEl.textContent='✅ Manual location set.'; userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`; debugEl.textContent=`User coords: ${userLat}, ${userLon}`; gpsAccuracyEl.style.display='none'; liveTracking=false;
+  if(mapContainer.style.display!=='none'){updateUserMarker(userLat,userLon);updateRoutes(userLat,userLon);}
 });
 
-// --- Check Inside (Auto meter/km format) ---
- async function checkInside(lat, lon, center){
-  const dist = await getDrivingDistance(lat, lon, center.lat, center.lon);
-  const formatDistance = (d) => d < 1 ? `${(d * 1000).toFixed(0)} meters` : `${d.toFixed(2)} km`;
+/* ---------- Highlight manual ---------- */
+function highlightManual(){document.getElementById('manualInputs').style.border='2px dashed red';manualStatus.textContent='👉 GPS fail हुआ, कृपया यहां Latitude और Longitude डालें।';window.scrollTo({top:document.getElementById('manualInputs').offsetTop-20,behavior:'smooth'});}
 
-  const inside = dist <= center.radius;
-  const msg = `Driving Distance to ${center.name}: ${formatDistance(dist)}`;if(inside){
+/* ---------- Check Inside ---------- */
+async function checkInside(lat,lon,center){
+  const dist=await getDrivingDistance(lat,lon,center.lat,center.lon);
+  const formatDistance=d=>d<1?`${(d*1000).toFixed(0)} meters`:`${d.toFixed(2)} km`;
+  const inside=dist<=center.radius; const msg=`Driving Distance to ${center.name}: ${formatDistance(dist)}`;
+  if(inside){
     searchResultEl.innerHTML=`<div class="ok">✅ ${msg} → अंदर है (within ${center.radius} km)</div>`;
     insideUser.textContent=`User: Latitude ${lat.toFixed(6)}, Longitude ${lon.toFixed(6)}`;
     insideSchool1.textContent=`Sarasvati School: Latitude ${centers[0].lat.toFixed(6)}, Longitude ${centers[0].lon.toFixed(6)}`;
     insideSchool2.textContent=`Government School: Latitude ${centers[1].lat.toFixed(6)}, Longitude ${centers[1].lon.toFixed(6)}`;
-    const dist1 = await getDrivingDistance(lat, lon, centers[0].lat, centers[0].lon);
-    const dist2 = await getDrivingDistance(lat, lon, centers[1].lat, centers[1].lon);
+    const dist1=await getDrivingDistance(lat,lon,centers[0].lat,centers[0].lon);
+    const dist2=await getDrivingDistance(lat,lon,centers[1].lat,centers[1].lon);
     distanceUserSchool1.textContent=`Driving Distance to Sarasvati School: ${formatDistance(dist1)}`;
     distanceUserSchool2.textContent=`Driving Distance to Government School: ${formatDistance(dist2)}`;
-
-    insideSection.style.display='block';
-    insideSection.scrollIntoView({behavior:'smooth'});} else {
+    insideSection.style.display='block'; insideSection.scrollIntoView({behavior:'smooth'});
+  } else {
     searchResultEl.innerHTML=`<div class="no">❌ ${msg} → बाहर है (beyond ${center.radius} km)</div>`;
     insideSection.style.display='none';
   }
   debugEl.textContent=`Debug: ${JSON.stringify({lat,lon,center},null,2)}`;
 }
 
-// Map toggle event
-mapToggle.addEventListener('click', toggleMap);
+/* ---------- Map toggle ---------- */
+mapToggle.addEventListener('click',toggleMap);
 </script>
 </body>
-</html> 
+</html>
