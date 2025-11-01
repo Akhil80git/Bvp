@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>School Location Checker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; padding:18px; max-width:900px; margin:auto; }
 h1 { font-size:20px; margin-bottom:6px; }
@@ -32,6 +33,11 @@ pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin
 .accuracy-low { color:red; }
 .loading { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-radius:50%; border-top-color:#fff; animation:spin 1s linear infinite; margin-right:6px; vertical-align:middle; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+/* Map styles */
+#mapContainer { display:none; height:400px; margin-top:20px; border-radius:8px; overflow:hidden; border:1px solid #ddd; }
+#mapToggle { background:#28a745; margin-top:10px; }
+#mapToggle.hide { background:#dc3545; }
 </style>
 </head>
 <body>
@@ -84,6 +90,12 @@ pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin
 </div>
 
 <div class="card">
+  <strong>Live Map:</strong>
+  <button id="mapToggle">🗺️ Show Live Map</button>
+  <div id="mapContainer"></div>
+</div>
+
+<div class="card">
   <strong>Debug:</strong>
   <pre id="debug">Ready.</pre>
 </div>
@@ -99,6 +111,7 @@ pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin
   <span id="distanceUserSchool2">Driving Distance to Government School: </span>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // --- Utility Functions ---
 function haversineKm(lat1, lon1, lat2, lon2){
@@ -129,6 +142,24 @@ async function getDrivingDistance(lat1, lon1, lat2, lon2) {
   }
 }
 
+// Get route geometry from OSRM
+async function getRouteGeometry(lat1, lon1, lat2, lon2) {
+  const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network error');
+    const data = await response.json();
+    if (data.code === 'Ok' && data.routes.length > 0) {
+      return data.routes[0].geometry;
+    } else {
+      throw new Error('No route found');
+    }
+  } catch (error) {
+    console.error('Error fetching route geometry:', error);
+    return null;
+  }
+}
+
 // --- DOM Refs ---
 const statusEl=document.getElementById('status');
 const manualStatus=document.getElementById('manualStatus');
@@ -148,11 +179,21 @@ const gpsAccuracyEl=document.getElementById('gpsAccuracy');
 const accuracyValueEl=document.getElementById('accuracyValue');
 const accuracyBarEl=document.getElementById('accuracyBar');
 const gpsLoadingEl=document.getElementById('gpsLoading');
+const mapContainer=document.getElementById('mapContainer');
+const mapToggle=document.getElementById('mapToggle');
 
 let userLat=null, userLon=null;
 let watchId=null;
 let bestAccuracy=Infinity;
 let bestCoords=null;
+
+// Map variables
+let map = null;
+let userMarker = null;
+let schoolMarkers = [];
+let routeLayers = [];
+let liveTracking = false;
+let mapWatchId = null;
 
 // --- School Centers ---
 let centers=[
@@ -193,6 +234,154 @@ function updateCentersFromInput(){
   });
 }
 renderCenters();
+
+// --- Map Functions ---
+function initMap() {
+  if (map) return;
+  
+  map = L.map('mapContainer').setView([24.6832581, 80.5419671], 15);
+  
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  
+  // Add school markers
+  centers.forEach((center, index) => {
+    const schoolMarker = L.marker([center.lat, center.lon])
+      .addTo(map)
+      .bindPopup(`<b>${center.name}</b><br>Radius: ${center.radius} km`);
+    
+    schoolMarkers.push(schoolMarker);
+  });
+  
+  // Add radius circles
+  centers.forEach(center => {
+    L.circle([center.lat, center.lon], {
+      color: 'blue',
+      fillColor: '#3388ff',
+      fillOpacity: 0.1,
+      radius: center.radius * 1000
+    }).addTo(map);
+  });
+}
+
+function updateUserMarker(lat, lon, accuracy) {
+  if (!map) return;
+  
+  // Remove existing user marker
+  if (userMarker) {
+    map.removeLayer(userMarker);
+  }
+  
+  // Add new user marker with accuracy circle
+  userMarker = L.marker([lat, lon])
+    .addTo(map)
+    .bindPopup(`<b>Your Location</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`)
+    .openPopup();
+  
+  // Add accuracy circle
+  if (accuracy) {
+    L.circle([lat, lon], {
+      color: 'red',
+      fillColor: '#f03',
+      fillOpacity: 0.2,
+      radius: accuracy
+    }).addTo(map);
+  }
+  
+  // Update map view to show user and schools
+  const bounds = L.latLngBounds([[lat, lon]]);
+  schoolMarkers.forEach(marker => {
+    bounds.extend(marker.getLatLng());
+  });
+  map.fitBounds(bounds, { padding: [20, 20] });
+}
+
+async function updateRoutes(lat, lon) {
+  if (!map) return;
+  
+  // Remove existing routes
+  routeLayers.forEach(layer => {
+    map.removeLayer(layer);
+  });
+  routeLayers = [];
+  
+  // Add routes to each school
+  for (let i = 0; i < centers.length; i++) {
+    const center = centers[i];
+    const geometry = await getRouteGeometry(lat, lon, center.lat, center.lon);
+    
+    if (geometry) {
+      const routeLayer = L.geoJSON(geometry, {
+        style: {
+          color: 'red',
+          weight: 4,
+          opacity: 0.7
+        }
+      }).addTo(map);
+      
+      routeLayers.push(routeLayer);
+    }
+  }
+}
+
+function toggleMap() {
+  if (mapContainer.style.display === 'none') {
+    mapContainer.style.display = 'block';
+    mapToggle.textContent = '🗺️ Hide Live Map';
+    mapToggle.classList.add('hide');
+    
+    if (!map) {
+      initMap();
+    }
+    
+    if (userLat && userLon) {
+      updateUserMarker(userLat, userLon, bestAccuracy);
+      updateRoutes(userLat, userLon);
+    }
+    
+    // Start live tracking if GPS is active
+    if (liveTracking) {
+      startMapTracking();
+    }
+  } else {
+    mapContainer.style.display = 'none';
+    mapToggle.textContent = '🗺️ Show Live Map';
+    mapToggle.classList.remove('hide');
+    
+    // Stop live tracking
+    if (mapWatchId !== null) {
+      navigator.geolocation.clearWatch(mapWatchId);
+      mapWatchId = null;
+    }
+  }
+}
+
+function startMapTracking() {
+  if (!navigator.geolocation || !map) return;
+  
+  if (mapWatchId !== null) {
+    navigator.geolocation.clearWatch(mapWatchId);
+  }
+  
+  mapWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy;
+      
+      updateUserMarker(lat, lon, accuracy);
+      updateRoutes(lat, lon);
+      
+      // Update user coordinates display
+      userCoordsEl.textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lon.toFixed(6)}`;
+    },
+    err => {
+      console.error('Map tracking error:', err);
+    },
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+  );
+}
 
 // --- 5 Second Optimized GPS ---
 btnUseCurrent.addEventListener('click', ()=>{
@@ -259,6 +448,16 @@ btnUseCurrent.addEventListener('click', ()=>{
         accuracyValueEl.textContent = `±${bestAccuracy.toFixed(1)} meters`;
         userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
         debugEl.textContent=`Final coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
+        
+        // Enable live tracking
+        liveTracking = true;
+        
+        // Update map if visible
+        if (mapContainer.style.display !== 'none') {
+          updateUserMarker(userLat, userLon, bestAccuracy);
+          updateRoutes(userLat, userLon);
+          startMapTracking();
+        }
       } else {
         statusEl.textContent='❌ 5 seconds में location नहीं मिली। कृपया manual set करें।';
         highlightManual();
@@ -288,6 +487,15 @@ btnManualSet.addEventListener('click', ()=>{
   userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
   debugEl.textContent=`User coords: ${userLat}, ${userLon}`;
   gpsAccuracyEl.style.display='none';
+  
+  // Disable live tracking for manual locations
+  liveTracking = false;
+  
+  // Update map if visible
+  if (mapContainer.style.display !== 'none') {
+    updateUserMarker(userLat, userLon);
+    updateRoutes(userLat, userLon);
+  }
 });
 
 // --- Check Inside (Auto meter/km format) ---
@@ -317,6 +525,9 @@ async function checkInside(lat, lon, center){
   }
   debugEl.textContent=`Debug: ${JSON.stringify({lat,lon,center},null,2)}`;
 }
+
+// Map toggle event
+mapToggle.addEventListener('click', toggleMap);
 </script>
 </body>
 </html>
