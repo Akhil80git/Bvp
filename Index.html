@@ -32,7 +32,6 @@ pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin
 .accuracy-low { color:red; }
 .loading { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-radius:50%; border-top-color:#fff; animation:spin 1s linear infinite; margin-right:6px; vertical-align:middle; }
 @keyframes spin { to { transform:rotate(360deg); } }
-.timer { font-size:12px; color:#666; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -62,7 +61,6 @@ pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin
       <span>Good</span>
       <span>Excellent</span>
     </div>
-    <div id="timer" class="timer"></div>
   </div>
   
   <div id="manualInputs" style="margin-top:10px;">
@@ -150,15 +148,12 @@ const gpsAccuracyEl=document.getElementById('gpsAccuracy');
 const accuracyValueEl=document.getElementById('accuracyValue');
 const accuracyBarEl=document.getElementById('accuracyBar');
 const gpsLoadingEl=document.getElementById('gpsLoading');
-const timerEl=document.getElementById('timer');
 
 let userLat=null;
 let userLon=null;
 let watchId = null;
 let bestAccuracy = Infinity;
 let bestCoords = null;
-let gpsStartTime = null;
-let timerInterval = null;
 
 // Centers - only the two schools
 let centers=[
@@ -200,23 +195,11 @@ function updateCentersFromInput(){
 }
 renderCenters();
 
-// Update timer display
-function updateTimer() {
-  if (!gpsStartTime) return;
-  const elapsed = Math.floor((Date.now() - gpsStartTime) / 1000);
-  timerEl.textContent = `Time elapsed: ${elapsed}s`;
-}
-
-// GPS location with faster timeout
+// GPS location with 20-second timeout and best accuracy
 btnUseCurrent.addEventListener('click', ()=>{
   statusEl.textContent='📡 GPS से location लेने की कोशिश हो रही है...';
   gpsLoadingEl.style.display = 'inline-block';
   gpsAccuracyEl.style.display = 'block';
-  gpsStartTime = Date.now();
-  
-  // Start timer
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(updateTimer, 1000);
   
   if(!navigator.geolocation){
     statusEl.textContent='❌ Browser geolocation supported नहीं है। कृपया manual location set करें।';
@@ -247,8 +230,10 @@ btnUseCurrent.addEventListener('click', ()=>{
           longitude: pos.coords.longitude,
           accuracy: accuracy
         };
-        
-        // Update display with best coordinates and accuracy
+      }
+      
+      // Update display with best coordinates and accuracy
+      if (bestCoords) {
         userLat = bestCoords.latitude;
         userLon = bestCoords.longitude;
         
@@ -272,64 +257,50 @@ btnUseCurrent.addEventListener('click', ()=>{
         debugEl.textContent=`User coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
         document.getElementById('manualLat').value = '';
         document.getElementById('manualLon').value = '';
-        
-        // If we have good accuracy, stop early (within 1-2 seconds)
-        if (bestAccuracy <= 20) {
-          clearGPS();
-        }
       }
     },
     err => {
       statusEl.textContent='❌ GPS error: '+err.message+' — कृपया manual location set करें।';
-      clearGPS();
+      gpsLoadingEl.style.display = 'none';
       highlightManual();
     },
     {
       enableHighAccuracy: true,
-      timeout: 5000, // Reduced from 10000 to 5000
+      timeout: 10000,
       maximumAge: 0
     }
   );
   
-  // Stop watching after 3 seconds maximum (instead of 20)
+  // Stop watching after 20 seconds
   setTimeout(() => {
-    clearGPS();
-    if (bestCoords) {
-      userLat = bestCoords.latitude;
-      userLon = bestCoords.longitude;
-      statusEl.textContent='✅ GPS location finalized.';
-      accuracyValueEl.textContent = `±${bestAccuracy.toFixed(1)} meters`;
-      if (bestAccuracy <= 5) {
-        accuracyValueEl.classList.add('accuracy-high');
-        accuracyBarEl.style.width = '100%';
-      } else if (bestAccuracy <= 15) {
-        accuracyValueEl.classList.add('accuracy-medium');
-        accuracyBarEl.style.width = '70%';
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      gpsLoadingEl.style.display = 'none';
+      if (bestCoords) {
+        userLat = bestCoords.latitude;
+        userLon = bestCoords.longitude;
+        statusEl.textContent='✅ GPS location finalized after 20 seconds.';
+        accuracyValueEl.textContent = `±${bestAccuracy.toFixed(1)} meters`;
+        if (bestAccuracy <= 5) {
+          accuracyValueEl.classList.add('accuracy-high');
+          accuracyBarEl.style.width = '100%';
+        } else if (bestAccuracy <= 15) {
+          accuracyValueEl.classList.add('accuracy-medium');
+          accuracyBarEl.style.width = '70%';
+        } else {
+          accuracyValueEl.classList.add('accuracy-low');
+          accuracyBarEl.style.width = '40%';
+        }
+        userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
+        debugEl.textContent=`Final coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
       } else {
-        accuracyValueEl.classList.add('accuracy-low');
-        accuracyBarEl.style.width = '40%';
+        statusEl.textContent='❌ No valid GPS data received in 20 seconds. कृपया manual location set करें।';
+        highlightManual();
       }
-      userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
-      debugEl.textContent=`Final coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
-    } else {
-      statusEl.textContent='❌ No valid GPS data received. कृपया manual location set करें।';
-      highlightManual();
     }
-  }, 3000); // Reduced from 20000 to 3000 (3 seconds)
+  }, 20000);
 });
-
-// Clear GPS resources
-function clearGPS() {
-  if (watchId !== null) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-  }
-  gpsLoadingEl.style.display = 'none';
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
-}
 
 // Highlight manual input
 function highlightManual(){
