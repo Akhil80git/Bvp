@@ -535,4 +535,31 @@ btnManualSet.addEventListener('click', ()=>{
 });
 
 // --- Check Inside (Auto meter/km format) ---
- 
+ async function checkInside(lat, lon, center){
+  const dist = await getDrivingDistance(lat, lon, center.lat, center.lon);
+  const formatDistance = (d) => d < 1 ? `${(d * 1000).toFixed(0)} meters` : `${d.toFixed(2)} km`;
+
+  const inside = dist <= center.radius;
+  const msg = `Driving Distance to ${center.name}: ${formatDistance(dist)}`;if(inside){
+    searchResultEl.innerHTML=`<div class="ok">✅ ${msg} → अंदर है (within ${center.radius} km)</div>`;
+    insideUser.textContent=`User: Latitude ${lat.toFixed(6)}, Longitude ${lon.toFixed(6)}`;
+    insideSchool1.textContent=`Sarasvati School: Latitude ${centers[0].lat.toFixed(6)}, Longitude ${centers[0].lon.toFixed(6)}`;
+    insideSchool2.textContent=`Government School: Latitude ${centers[1].lat.toFixed(6)}, Longitude ${centers[1].lon.toFixed(6)}`;
+    const dist1 = await getDrivingDistance(lat, lon, centers[0].lat, centers[0].lon);
+    const dist2 = await getDrivingDistance(lat, lon, centers[1].lat, centers[1].lon);
+    distanceUserSchool1.textContent=`Driving Distance to Sarasvati School: ${formatDistance(dist1)}`;
+    distanceUserSchool2.textContent=`Driving Distance to Government School: ${formatDistance(dist2)}`;
+
+    insideSection.style.display='block';
+    insideSection.scrollIntoView({behavior:'smooth'});} else {
+    searchResultEl.innerHTML=`<div class="no">❌ ${msg} → बाहर है (beyond ${center.radius} km)</div>`;
+    insideSection.style.display='none';
+  }
+  debugEl.textContent=`Debug: ${JSON.stringify({lat,lon,center},null,2)}`;
+}
+
+// Map toggle event
+mapToggle.addEventListener('click', toggleMap);
+</script>
+</body>
+</html> 
