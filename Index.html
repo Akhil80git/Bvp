@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School Location Checker</title>
+<style>
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; padding:18px; max-width:900px; margin:auto; }
+h1 { font-size:20px; margin-bottom:6px; }
+.card { border:1px solid #ddd; padding:14px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.03); margin-bottom:12px; }
+label { display:block; margin-top:8px; font-weight:600; }
+input[type="number"] { width:100%; padding:6px; margin-top:4px; box-sizing:border-box; border-radius:6px; border:1px solid #ccc; }
+button { margin-top:6px; padding:6px 10px; border-radius:6px; border:none; cursor:pointer; background:#1473e6; color:white; }
+.small { font-size:13px; color:#555; margin-top:6px; }
+.ok { color:green; font-weight:700; }
+.no { color:red; font-weight:700; }
+.row { display:flex; gap:8px; margin-top:6px; align-items:center; }
+.col { flex:1; }
+.center-button { background:#22a; }
+pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin-top:8px; }
+#userCoords { margin-top:8px; font-weight:600; color:#1473e6; }
+#insideSection { display:none; padding:40px; text-align:center; font-size:20px; border:2px solid #1473e6; border-radius:12px; margin-top:20px; background:#f0f8ff; }
+#insideSection span { display:block; margin-top:12px; font-size:18px; color:#000; }
+
+/* Accuracy indicator styles */
+#gpsAccuracy { margin-top:8px; font-size:13px; color:#555; }
+.progress { height:6px; background:#f1f1f1; border-radius:3px; margin-top:8px; overflow:hidden; }
+.progress-bar { height:100%; background:#1473e6; border-radius:3px; width:0%; transition:width 0.5s; }
+.accuracy-info { display:flex; justify-content:space-between; font-size:12px; color:#555; margin-top:4px; }
+.accuracy-high { color:green; }
+.accuracy-medium { color:orange; }
+.accuracy-low { color:red; }
+.loading { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-radius:50%; border-top-color:#fff; animation:spin 1s linear infinite; margin-right:6px; vertical-align:middle; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="mainSection">
+<h1>School Location Checker</h1>
+
+<div class="card">
+  <strong>Current / Manual Location:</strong>
+  <div id="status" class="small">Ready — "Use current location" दबाएँ या manual location set करें।</div>
+  <button id="btnUseCurrent">
+    <span id="gpsLoading" class="loading" style="display:none;"></span>
+    📍 Use current location (GPS)
+  </button>
+  <button id="btnManualSet">🖊️ Set Manual Location</button>
+  
+  <div id="gpsAccuracy" style="display:none;">
+    <div class="accuracy-info">
+      <span>Accuracy:</span>
+      <span id="accuracyValue"></span>
+    </div>
+    <div class="progress">
+      <div id="accuracyBar" class="progress-bar"></div>
+    </div>
+    <div class="accuracy-info">
+      <span>Poor</span>
+      <span>Good</span>
+      <span>Excellent</span>
+    </div>
+  </div>
+  
+  <div id="manualInputs" style="margin-top:10px;">
+    <label>Latitude:</label>
+    <input type="number" id="manualLat" step="any" placeholder="e.g., 24.6832581">
+    <label>Longitude:</label>
+    <input type="number" id="manualLon" step="any" placeholder="e.g., 80.5419671">
+  </div>
+  <div id="manualStatus" class="small"></div>
+  <div id="userCoords"></div>
+</div>
+
+<div class="card">
+  <strong>School Locations (radius editable):</strong>
+  <div id="centersContainer" style="margin-top:8px;"></div>
+</div>
+
+<div class="card">
+  <strong>Results:</strong>
+  <div id="searchResult" class="small" style="margin-top:4px;"></div>
+</div>
+
+<div class="card">
+  <strong>Debug:</strong>
+  <pre id="debug">Ready.</pre>
+</div>
+</div>
+
+<!-- Inside Section -->
+<div id="insideSection">
+  <strong>आप इस school के अंदर हैं! 😊</strong>
+  <span id="insideUser">User: </span>
+  <span id="insideSchool1">Sarasvati School: </span>
+  <span id="insideSchool2">Government School: </span>
+  <span id="distanceUserSchool1">Driving Distance to Sarasvati School: </span>
+  <span id="distanceUserSchool2">Driving Distance to Government School: </span>
+</div>
+
+<script>
+// Haversine formula
+function haversineKm(lat1, lon1, lat2, lon2){
+  const R=6371;
+  const toRad=deg=>deg*Math.PI/180;
+  const dLat=toRad(lat2-lat1);
+  const dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  return R*c;
+}
+
+// Driving distance via OSRM API
+async function getDrivingDistance(lat1, lon1, lat2, lon2) {
+  const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false&steps=true`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network error');
+    const data = await response.json();
+    if (data.code === 'Ok' && data.routes.length > 0) {
+      return data.routes[0].distance / 1000;
+    } else {
+      throw new Error('No route found');
+    }
+  } catch (error) {
+    console.error('Error fetching driving distance:', error);
+    return haversineKm(lat1, lon1, lat2, lon2);
+  }
+}
+
+// DOM refs
+const statusEl=document.getElementById('status');
+const manualStatus=document.getElementById('manualStatus');
+const centersContainer=document.getElementById('centersContainer');
+const btnUseCurrent=document.getElementById('btnUseCurrent');
+const btnManualSet=document.getElementById('btnManualSet');
+const searchResultEl=document.getElementById('searchResult');
+const debugEl=document.getElementById('debug');
+const userCoordsEl=document.getElementById('userCoords');
+const insideSection=document.getElementById('insideSection');
+const insideUser=document.getElementById('insideUser');
+const insideSchool1=document.getElementById('insideSchool1');
+const insideSchool2=document.getElementById('insideSchool2');
+const distanceUserSchool1=document.getElementById('distanceUserSchool1');
+const distanceUserSchool2=document.getElementById('distanceUserSchool2');
+const gpsAccuracyEl=document.getElementById('gpsAccuracy');
+const accuracyValueEl=document.getElementById('accuracyValue');
+const accuracyBarEl=document.getElementById('accuracyBar');
+const gpsLoadingEl=document.getElementById('gpsLoading');
+
+let userLat=null;
+let userLon=null;
+let watchId = null;
+let bestAccuracy = Infinity;
+let bestCoords = null;
+
+// Centers - only the two schools
+let centers=[
+  {name:'Sarasvati School', lat:24.6832581, lon:80.5419671, radius:1},
+  {name:'Government School', lat:24.6835231, lon:80.5439499, radius:1}
+];
+
+// Render centers
+function renderCenters(){
+  centersContainer.innerHTML='';
+  centers.forEach((c,i)=>{
+    const row=document.createElement('div');
+    row.className='row';
+    row.innerHTML=`
+      <div class="col"><strong>${c.name}</strong></div>
+      <div class="col"><input type="number" step="0.1" data-index="${i}" class="centerRadius" value="${c.radius}" placeholder="Radius (km)"></div>
+      <div class="col"><button class="center-button" data-index="${i}">Check</button></div>
+    `;
+    centersContainer.appendChild(row);
+  });
+  document.querySelectorAll('.center-button').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx=parseInt(btn.getAttribute('data-index'));
+      updateCentersFromInput();
+      if(userLat===null || userLon===null){
+        alert('Please set current or manual location first.');
+        return;
+      }
+      await checkInside(userLat, userLon, centers[idx]);
+    });
+  });
+}
+function updateCentersFromInput(){
+  document.querySelectorAll('.centerRadius').forEach(inp=>{
+    const idx=parseInt(inp.getAttribute('data-index'));
+    const val=parseFloat(inp.value);
+    if(!isNaN(val)) centers[idx].radius=val;
+  });
+}
+renderCenters();
+
+// GPS location with 20-second timeout and best accuracy
+btnUseCurrent.addEventListener('click', ()=>{
+  statusEl.textContent='📡 GPS से location लेने की कोशिश हो रही है...';
+  gpsLoadingEl.style.display = 'inline-block';
+  gpsAccuracyEl.style.display = 'block';
+  
+  if(!navigator.geolocation){
+    statusEl.textContent='❌ Browser geolocation supported नहीं है। कृपया manual location set करें।';
+    gpsLoadingEl.style.display = 'none';
+    highlightManual();
+    return;
+  }
+  
+  // Clear any existing watcher
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+  }
+  
+  // Reset best accuracy
+  bestAccuracy = Infinity;
+  bestCoords = null;
+  
+  // Start watching position with high accuracy
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      const accuracy = pos.coords.accuracy;
+      
+      // Update best coordinates if this reading is more accurate
+      if (accuracy < bestAccuracy) {
+        bestAccuracy = accuracy;
+        bestCoords = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: accuracy
+        };
+      }
+      
+      // Update display with best coordinates and accuracy
+      if (bestCoords) {
+        userLat = bestCoords.latitude;
+        userLon = bestCoords.longitude;
+        
+        // Update accuracy display
+        accuracyValueEl.textContent = `±${bestAccuracy.toFixed(1)} meters`;
+        accuracyValueEl.className = '';
+        
+        if (bestAccuracy <= 5) {
+          accuracyValueEl.classList.add('accuracy-high');
+          accuracyBarEl.style.width = '100%';
+        } else if (bestAccuracy <= 15) {
+          accuracyValueEl.classList.add('accuracy-medium');
+          accuracyBarEl.style.width = '70%';
+        } else {
+          accuracyValueEl.classList.add('accuracy-low');
+          accuracyBarEl.style.width = '40%';
+        }
+        
+        statusEl.textContent='✅ GPS location set हो गई।';
+        userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
+        debugEl.textContent=`User coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
+        document.getElementById('manualLat').value = '';
+        document.getElementById('manualLon').value = '';
+      }
+    },
+    err => {
+      statusEl.textContent='❌ GPS error: '+err.message+' — कृपया manual location set करें।';
+      gpsLoadingEl.style.display = 'none';
+      highlightManual();
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+  
+  // Stop watching after 20 seconds
+  setTimeout(() => {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      gpsLoadingEl.style.display = 'none';
+      if (bestCoords) {
+        userLat = bestCoords.latitude;
+        userLon = bestCoords.longitude;
+        statusEl.textContent='✅ GPS location finalized after 20 seconds.';
+        accuracyValueEl.textContent = `±${bestAccuracy.toFixed(1)} meters`;
+        if (bestAccuracy <= 5) {
+          accuracyValueEl.classList.add('accuracy-high');
+          accuracyBarEl.style.width = '100%';
+        } else if (bestAccuracy <= 15) {
+          accuracyValueEl.classList.add('accuracy-medium');
+          accuracyBarEl.style.width = '70%';
+        } else {
+          accuracyValueEl.classList.add('accuracy-low');
+          accuracyBarEl.style.width = '40%';
+        }
+        userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
+        debugEl.textContent=`Final coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
+      } else {
+        statusEl.textContent='❌ No valid GPS data received in 20 seconds. कृपया manual location set करें।';
+        highlightManual();
+      }
+    }
+  }, 20000);
+});
+
+// Highlight manual input
+function highlightManual(){
+  document.getElementById('manualInputs').style.border='2px dashed red';
+  manualStatus.textContent='👉 GPS fail हुआ, कृपया यहां Latitude और Longitude डालें।';
+  window.scrollTo({top: document.getElementById('manualInputs').offsetTop-20, behavior:'smooth'});
+}
+
+// Manual location set
+btnManualSet.addEventListener('click', ()=>{
+  const lat = parseFloat(document.getElementById('manualLat').value);
+  const lon = parseFloat(document.getElementById('manualLon').value);
+  if(isNaN(lat) || isNaN(lon)){
+    manualStatus.textContent='❌ Invalid input!';
+    return;
+  }
+  userLat = lat;
+  userLon = lon;
+  manualStatus.textContent='✅ Manual location set हो गई।';
+  statusEl.textContent='✅ Manual location set.';
+  userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
+  debugEl.textContent=`User coords: ${userLat}, ${userLon}`;
+  gpsAccuracyEl.style.display = 'none';
+});
+
+// Check inside center
+async function checkInside(lat, lon, center){
+  const dist = await getDrivingDistance(lat, lon, center.lat, center.lon);
+  const inside = dist <= center.radius;
+  const msg = `Driving Distance to ${center.name}: ${dist.toFixed(2)} km`;
+
+  if(inside){
+    searchResultEl.innerHTML=`<div class="ok">✅ ${msg} → अंदर है (within ${center.radius} km)</div>`;
+    insideUser.textContent=`User: Latitude ${lat.toFixed(6)}, Longitude ${lon.toFixed(6)}`;
+    insideSchool1.textContent=`Sarasvati School: Latitude ${centers[0].lat.toFixed(6)}, Longitude ${centers[0].lon.toFixed(6)}`;
+    insideSchool2.textContent=`Government School: Latitude ${centers[1].lat.toFixed(6)}, Longitude ${centers[1].lon.toFixed(6)}`;
+    
+    const distToSchool1 = await getDrivingDistance(lat, lon, centers[0].lat, centers[0].lon);
+    const distToSchool2 = await getDrivingDistance(lat, lon, centers[1].lat, centers[1].lon);
+    
+    distanceUserSchool1.textContent=`Driving Distance to Sarasvati School: ${distToSchool1.toFixed(3)} km`;
+    distanceUserSchool2.textContent=`Driving Distance to Government School: ${distToSchool2.toFixed(3)} km`;
+    
+    insideSection.style.display='block';
+    insideSection.scrollIntoView({behavior:'smooth'});
+  } else {
+    searchResultEl.innerHTML=`<div class="no">❌ ${msg} → बाहर है (beyond ${center.radius} km)</div>`;
+    insideSection.style.display='none';
+  }
+  debugEl.textContent=`Debug: ${JSON.stringify({lat,lon,center},null,2)}`;
+}
+</script>
+</body>
+  </html>
