@@ -1,406 +1,538 @@
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Live School Route Tracker</title>
-
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-sA+e2k3s5f1gY0Gq4kqv9gq0kF5k7b9gq5p3gkXQk0M=" crossorigin=""/>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School Location Checker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  body{font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; margin:0; padding:0;}
-  #topbar{padding:12px; background:#1473e6; color:white; display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
-  #topbar h1{font-size:16px; margin:0;}
-  .btn{background:#ffffff22; color:white; border:0; padding:8px 10px; border-radius:6px; cursor:pointer;}
-  .btn:active{transform:translateY(1px);}
-  #statusSmall{font-size:13px; opacity:0.95; margin-left:auto; color:#fff; }
-  #map{height:60vh; min-height:360px;}
-  #panels{display:flex; gap:12px; padding:12px; flex-wrap:wrap; }
-  .card{background:#fff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:12px; flex:1; min-width:260px;}
-  .small{font-size:13px; color:#333;}
-  .ok{color:green; font-weight:700;}
-  .no{color:red; font-weight:700;}
-  pre{background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; max-height:120px;}
-  .accuracy-info{font-size:13px; color:#555; margin-top:6px;}
-  .center-list{margin-top:6px;}
-  .center-item{display:flex; gap:8px; align-items:center; margin-bottom:6px;}
-  .center-item strong{flex:1;}
-  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;}
-  #insideSection{display:none; padding:12px; border-radius:8px; background:#f0fff4; margin-top:8px; border:1px solid #b7f0c6;}
-  /* small responsive */
-  @media (max-width:720px){ #panels{flex-direction:column;} #topbar{gap:6px;} }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; padding:18px; max-width:900px; margin:auto; }
+h1 { font-size:20px; margin-bottom:6px; }
+.card { border:1px solid #ddd; padding:14px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.03); margin-bottom:12px; }
+label { display:block; margin-top:8px; font-weight:600; }
+input[type="number"] { width:100%; padding:6px; margin-top:4px; box-sizing:border-box; border-radius:6px; border:1px solid #ccc; }
+button { margin-top:6px; padding:6px 10px; border-radius:6px; border:none; cursor:pointer; background:#1473e6; color:white; }
+.small { font-size:13px; color:#555; margin-top:6px; }
+.ok { color:green; font-weight:700; }
+.no { color:red; font-weight:700; }
+.row { display:flex; gap:8px; margin-top:6px; align-items:center; }
+.col { flex:1; }
+.center-button { background:#22a; }
+pre { background:#f7f7f7; padding:10px; border-radius:6px; overflow:auto; margin-top:8px; }
+#userCoords { margin-top:8px; font-weight:600; color:#1473e6; }
+#insideSection { display:none; padding:40px; text-align:center; font-size:20px; border:2px solid #1473e6; border-radius:12px; margin-top:20px; background:#f0f8ff; }
+#insideSection span { display:block; margin-top:12px; font-size:18px; color:#000; }
+
+/* Accuracy indicator styles */
+#gpsAccuracy { margin-top:8px; font-size:13px; color:#555; }
+.progress { height:6px; background:#f1f1f1; border-radius:3px; margin-top:8px; overflow:hidden; }
+.progress-bar { height:100%; background:#1473e6; border-radius:3px; width:0%; transition:width 0.5s; }
+.accuracy-info { display:flex; justify-content:space-between; font-size:12px; color:#555; margin-top:4px; }
+.accuracy-high { color:green; }
+.accuracy-medium { color:orange; }
+.accuracy-low { color:red; }
+.loading { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.3); border-radius:50%; border-top-color:#fff; animation:spin 1s linear infinite; margin-right:6px; vertical-align:middle; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Map styles */
+#mapContainer { display:none; height:400px; margin-top:20px; border-radius:8px; overflow:hidden; border:1px solid #ddd; }
+#mapToggle { background:#28a745; margin-top:10px; }
+#mapToggle.hide { background:#dc3545; }
+.map-legend { position:absolute; bottom:20px; right:20px; background:white; padding:10px; border-radius:5px; box-shadow:0 0 10px rgba(0,0,0,0.2); z-index:1000; font-size:12px; }
+.legend-item { display:flex; align-items:center; margin-bottom:5px; }
+.legend-color { width:15px; height:15px; margin-right:8px; border-radius:3px; }
 </style>
 </head>
 <body>
 
-<div id="topbar">
-  <h1>School Live Route Tracker (Leaflet + OSRM)</h1>
-  <button id="btnStart" class="btn">📍 Start Live Tracking</button>
-  <button id="btnStop" class="btn" style="display:none;background:#ff6b6b;">⏹️ Stop</button>
-  <button id="btnManual" class="btn">🖊️ Manual Set</button>
-  <div id="statusSmall">Ready — "Start Live Tracking" दबाएँ या manual set करें।</div>
+<div id="mainSection">
+<h1>School Location Checker</h1>
+
+<div class="card">
+  <strong>Current / Manual Location:</strong>
+  <div id="status" class="small">Ready — "Use current location" दबाएँ या manual location set करें।</div>
+  <button id="btnUseCurrent">
+    <span id="gpsLoading" class="loading" style="display:none;"></span>
+    📍 Use current location (GPS)
+  </button>
+  <button id="btnManualSet">🖊️ Set Manual Location</button>
+  
+  <div id="gpsAccuracy" style="display:none;">
+    <div class="accuracy-info">
+      <span>Accuracy:</span>
+      <span id="accuracyValue"></span>
+    </div>
+    <div class="progress">
+      <div id="accuracyBar" class="progress-bar"></div>
+    </div>
+    <div class="accuracy-info">
+      <span>Poor</span>
+      <span>Good</span>
+      <span>Excellent</span>
+    </div>
+  </div>
+  
+  <div id="manualInputs" style="margin-top:10px;">
+    <label>Latitude:</label>
+    <input type="number" id="manualLat" step="any" placeholder="e.g., 24.6832581">
+    <label>Longitude:</label>
+    <input type="number" id="manualLon" step="any" placeholder="e.g., 80.5419671">
+  </div>
+  <div id="manualStatus" class="small"></div>
+  <div id="userCoords"></div>
 </div>
 
-<div id="map"></div>
-
-<div id="panels">
-  <div class="card">
-    <div class="small"><strong>Position & Accuracy</strong></div>
-    <div id="posInfo" class="small" style="margin-top:8px;">No position yet.</div>
-    <div id="accuracyInfo" class="accuracy-info" style="display:none;">
-      Accuracy: <span id="accVal"></span> meters
-    </div>
-    <div id="insideSection">
-      <div id="insideMsg" class="ok">आप चुने हुए school के अंदर हैं।</div>
-      <div id="insideDetails" class="small"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="small"><strong>Schools (edit radius)</strong></div>
-    <div class="center-list" id="centerList"></div>
-    <div style="margin-top:8px;">
-      <label class="small"><input type="checkbox" id="followUser" checked> Map follow user</label>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="small"><strong>Distances (live)</strong></div>
-    <div style="margin-top:8px;">
-      <div id="d1" class="small">Sarasvati School: —</div>
-      <div id="d2" class="small" style="margin-top:6px;">Government School: —</div>
-    </div>
-
-    <div style="margin-top:8px;">
-      <div class="small"><strong>Debug</strong></div>
-      <pre id="debug">Ready.</pre>
-    </div>
-  </div>
+<div class="card">
+  <strong>School Locations (radius editable):</strong>
+  <div id="centersContainer" style="margin-top:8px;"></div>
 </div>
 
-<!-- Manual modal-like inputs (simple) -->
-<div id="manualContainer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); align-items:center; justify-content:center;">
-  <div style="background:white; padding:14px; border-radius:8px; width:320px;">
-    <h3 style="margin:0 0 10px 0;">Manual Location Set</h3>
-    <label class="small">Latitude</label>
-    <input id="manLat" type="number" step="any" style="width:100%; padding:8px; box-sizing:border-box; margin-top:6px;">
-    <label class="small" style="margin-top:8px;">Longitude</label>
-    <input id="manLon" type="number" step="any" style="width:100%; padding:8px; box-sizing:border-box; margin-top:6px;">
-    <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
-      <button id="manCancel" class="btn" style="background:#ddd;color:#000;">Cancel</button>
-      <button id="manSave" class="btn">Set</button>
-    </div>
-  </div>
+<div class="card">
+  <strong>Results:</strong>
+  <div id="searchResult" class="small" style="margin-top:4px;"></div>
 </div>
 
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-o9N1jKQbJ+vG0y2gX/2jz0bPj1bKPs6b1gW+6bM1f0k=" crossorigin=""></script>
+<div class="card">
+  <strong>Live Map:</strong>
+  <button id="mapToggle">🗺️ Show Live Map</button>
+  <div id="mapContainer"></div>
+</div>
 
+<div class="card">
+  <strong>Debug:</strong>
+  <pre id="debug">Ready.</pre>
+</div>
+</div>
+
+<!-- Inside Section -->
+<div id="insideSection">
+  <strong>आप इस school के अंदर हैं! 😊</strong>
+  <span id="insideUser">User: </span>
+  <span id="insideSchool1">Sarasvati School: </span>
+  <span id="insideSchool2">Government School: </span>
+  <span id="distanceUserSchool1">Driving Distance to Sarasvati School: </span>
+  <span id="distanceUserSchool2">Driving Distance to Government School: </span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/*
-  Full single-file implementation:
-  - Live watchPosition (fallback to manual)
-  - Leaflet map with user marker (moving)
-  - Two school markers
-  - Driving route (OSRM) polylines from user to each school (red)
-  - Distances updated live (driving distance when OSRM available; else haversine)
-  - Debounce route requests to avoid too many calls while moving
-  - All in-page (no server side)
-*/
-
-/* --- CONFIG --- */
-const centers = [
-  { name: 'Sarasvati School', lat: 24.6832581, lon: 80.5419671, radiusKm: 1 },
-  { name: 'Government School', lat: 24.6835231, lon: 80.5439499, radiusKm: 1 }
-];
-
-// OSRM routing base - using routing.openstreetmap.de (public)
-const OSRM_BASE = 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
-
-/* --- STATE --- */
-let map, userMarker, accuracyCircle;
-let centerMarkers = [];
-let routeLayers = []; // polyline layers for each center
-let watchId = null;
-let lastRouteRequest = 0;
-const ROUTE_MIN_INTERVAL_MS = 2500; // at least 2.5s between route requests
-let lastPos = null;
-
-/* --- Helpers --- */
-function toFixedCoords(v){ return (Math.round(v*1e6)/1e6); }
-function haversineKm(lat1,lon1,lat2,lon2){
+// --- Utility Functions ---
+function haversineKm(lat1, lon1, lat2, lon2){
   const R=6371;
   const toRad=deg=>deg*Math.PI/180;
   const dLat=toRad(lat2-lat1);
   const dLon=toRad(lon2-lon1);
-  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  const c=2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  const c=2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
   return R*c;
 }
-function fmtDistanceKm(dKm){
-  if (dKm < 1) return `${Math.round(dKm*1000)} meters`;
-  return `${dKm.toFixed(2)} km`;
-}
 
-/* --- Map Init --- */
-function initMap(){
-  map = L.map('map', { zoomControl:true }).setView([centers[0].lat, centers[0].lon], 15);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  // Add center markers
-  centers.forEach((c,i)=>{
-    const m = L.marker([c.lat, c.lon], { title:c.name }).addTo(map);
-    m.bindPopup(`<strong>${c.name}</strong><br>Radius: <span id="rad-${i}">${c.radiusKm}</span> km`);
-    centerMarkers.push(m);
-    // prepare empty polyline
-    const poly = L.geoJSON(null, { style: { color: '#d32f2f', weight:4, opacity:0.85 } }).addTo(map);
-    routeLayers.push(poly);
-  });
-
-  // user marker + accuracy circle
-  userMarker = L.circleMarker([0,0], { radius:8, color:'#1473e6', fillColor:'#1473e6', fillOpacity:1 }).addTo(map);
-  userMarker.bindPopup('User location');
-
-  accuracyCircle = L.circle([0,0], { radius:0, color:'#1473e6', weight:1, fillOpacity:0.05 }).addTo(map);
-  userMarker.setOpacity(0);
-
-  // show center list with editable radius
-  renderCenterList();
-}
-
-/* --- Render center radius editors --- */
-function renderCenterList(){
-  const el = document.getElementById('centerList');
-  el.innerHTML = '';
-  centers.forEach((c,i)=>{
-    const div = document.createElement('div');
-    div.className = 'center-item';
-    div.innerHTML = `
-      <strong>${c.name}</strong>
-      <input type="number" step="0.1" id="radInput-${i}" value="${c.radiusKm}" style="width:80px; padding:6px;">
-      <button id="btnChk-${i}" class="btn" style="padding:6px;">Check</button>
-    `;
-    el.appendChild(div);
-
-    document.getElementById(`btnChk-${i}`).addEventListener('click', ()=>{
-      if (!lastPos) { alert('Pehele location set karein (Start Live Tracking ya Manual Set).'); return; }
-      checkInside(lastPos.lat, lastPos.lon, i);
-    });
-
-    document.getElementById(`radInput-${i}`).addEventListener('change', (e)=>{
-      const v = parseFloat(e.target.value);
-      if (!isNaN(v)) {
-        centers[i].radiusKm = v;
-        document.getElementById(`rad-${i}`).textContent = v;
-      }
-    });
-  });
-}
-
-/* --- Check if inside center radius using driving distance if available else haversine --- */
-async function checkInside(userLat, userLon, centerIdx){
-  const center = centers[centerIdx];
-  // try driving distance first (OSRM)
-  const dist = await getDrivingDistance(userLat,userLon, center.lat, center.lon);
-  const inside = dist <= center.radiusKm + 1e-9;
-  const msg = `${center.name}: ${fmtDistanceKm(dist)} — radius ${center.radiusKm} km`;
-  const resEl = document.getElementById('posInfo');
-  if (inside){
-    document.getElementById('insideSection').style.display = 'block';
-    document.getElementById('insideDetails').textContent = msg;
-    resEl.innerHTML = `<span class="ok">✅ ${msg} → अंदर है</span>`;
-  } else {
-    document.getElementById('insideSection').style.display = 'none';
-    resEl.innerHTML = `<span class="no">❌ ${msg} → बाहर है</span>`;
-  }
-}
-
-/* --- OSRM Route fetch (returns {distanceKm, geojson}) --- */
-async function fetchRouteGeojson(lat1,lon1,lat2,lon2){
-  // build URL with overview=full & geometries=geojson
-  const coords = `${lon1},${lat1};${lon2},${lat2}`;
-  const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&steps=false`;
+// Driving distance via OSRM API
+async function getDrivingDistance(lat1, lon1, lat2, lon2) {
+  const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false&steps=true`;
   try {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('network');
-    const j = await resp.json();
-    if (j.code === 'Ok' && j.routes && j.routes.length>0){
-      const route = j.routes[0];
-      return {
-        distanceKm: route.distance / 1000,
-        geojson: route.geometry // GeoJSON LineString
-      };
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network error');
+    const data = await response.json();
+    if (data.code === 'Ok' && data.routes.length > 0) {
+      return data.routes[0].distance / 1000;
     } else {
-      // fallback to straight line distance
-      return { distanceKm: haversineKm(lat1,lon1,lat2,lon2), geojson: null };
+      throw new Error('No route found');
     }
-  } catch (e){
-    // network or CORS or other error
-    return { distanceKm: haversineKm(lat1,lon1,lat2,lon2), geojson: null };
+  } catch (error) {
+    console.error('Error fetching driving distance:', error);
+    return haversineKm(lat1, lon1, lat2, lon2);
   }
 }
 
-/* --- Request + draw routes for each center (debounced) --- */
-async function updateRoutesAndDistances(userLat, userLon){
-  const now = Date.now();
-  if (now - lastRouteRequest < ROUTE_MIN_INTERVAL_MS) return;
-  lastRouteRequest = now;
+// Get route geometry from OSRM
+async function getRouteGeometry(lat1, lon1, lat2, lon2) {
+  const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network error');
+    const data = await response.json();
+    if (data.code === 'Ok' && data.routes.length > 0) {
+      return data.routes[0].geometry;
+    } else {
+      throw new Error('No route found');
+    }
+  } catch (error) {
+    console.error('Error fetching route geometry:', error);
+    return null;
+  }
+}
 
-  // update each center route
-  for (let i=0;i<centers.length;i++){
-    try {
-      const r = await fetchRouteGeojson(userLat,userLon, centers[i].lat, centers[i].lon);
-      // update distance display
-      const distEl = document.getElementById(i===0?'d1':'d2');
-      distEl.textContent = `${centers[i].name}: ${fmtDistanceKm(r.distanceKm)}`;
+// --- DOM Refs ---
+const statusEl=document.getElementById('status');
+const manualStatus=document.getElementById('manualStatus');
+const centersContainer=document.getElementById('centersContainer');
+const btnUseCurrent=document.getElementById('btnUseCurrent');
+const btnManualSet=document.getElementById('btnManualSet');
+const searchResultEl=document.getElementById('searchResult');
+const debugEl=document.getElementById('debug');
+const userCoordsEl=document.getElementById('userCoords');
+const insideSection=document.getElementById('insideSection');
+const insideUser=document.getElementById('insideUser');
+const insideSchool1=document.getElementById('insideSchool1');
+const insideSchool2=document.getElementById('insideSchool2');
+const distanceUserSchool1=document.getElementById('distanceUserSchool1');
+const distanceUserSchool2=document.getElementById('distanceUserSchool2');
+const gpsAccuracyEl=document.getElementById('gpsAccuracy');
+const accuracyValueEl=document.getElementById('accuracyValue');
+const accuracyBarEl=document.getElementById('accuracyBar');
+const gpsLoadingEl=document.getElementById('gpsLoading');
+const mapContainer=document.getElementById('mapContainer');
+const mapToggle=document.getElementById('mapToggle');
 
-      // update polyline layer
-      routeLayers[i].clearLayers();
-      if (r.geojson){
-        // GeoJSON LineString -> add to layer
-        routeLayers[i].addData(r.geojson);
-        // ensure style (red) is applied via options earlier
-      } else {
-        // no route geometry -> draw simple straight line
-        const line = {
-          "type":"Feature",
-          "geometry": {
-            "type":"LineString",
-            "coordinates": [
-              [userLon, userLat],
-              [centers[i].lon, centers[i].lat]
-            ]
-          }
+let userLat=null, userLon=null;
+let watchId=null;
+let bestAccuracy=Infinity;
+let bestCoords=null;
+
+// Map variables
+let map = null;
+let userMarker = null;
+let userPath = null;
+let schoolMarkers = [];
+let routeLayers = [];
+let liveTracking = false;
+let mapWatchId = null;
+
+// --- School Centers ---
+let centers=[
+  {name:'Sarasvati School', lat:24.6832581, lon:80.5419671, radius:1},
+  {name:'Government School', lat:24.6835231, lon:80.5439499, radius:1}
+];
+
+// --- Render Centers ---
+function renderCenters(){
+  centersContainer.innerHTML='';
+  centers.forEach((c,i)=>{
+    const row=document.createElement('div');
+    row.className='row';
+    row.innerHTML=`
+      <div class="col"><strong>${c.name}</strong></div>
+      <div class="col"><input type="number" step="0.1" data-index="${i}" class="centerRadius" value="${c.radius}" placeholder="Radius (km)"></div>
+      <div class="col"><button class="center-button" data-index="${i}">Check</button></div>
+    `;
+    centersContainer.appendChild(row);
+  });
+  document.querySelectorAll('.center-button').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx=parseInt(btn.getAttribute('data-index'));
+      updateCentersFromInput();
+      if(userLat===null || userLon===null){
+        alert('Please set current or manual location first.');
+        return;
+      }
+      await checkInside(userLat, userLon, centers[idx]);
+    });
+  });
+}
+function updateCentersFromInput(){
+  document.querySelectorAll('.centerRadius').forEach(inp=>{
+    const idx=parseInt(inp.getAttribute('data-index'));
+    const val=parseFloat(inp.value);
+    if(!isNaN(val)) centers[idx].radius=val;
+  });
+}
+renderCenters();
+
+// --- Map Functions ---
+function initMap() {
+  if (map) return;
+  
+  map = L.map('mapContainer').setView([24.6832581, 80.5419671], 15);
+  
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  
+  // Add school markers with different colors
+  const sarasvatiMarker = L.marker([centers[0].lat, centers[0].lon])
+    .addTo(map)
+    .bindPopup(`<b>${centers[0].name}</b><br>Radius: ${centers[0].radius} km`);
+  
+  const govtMarker = L.marker([centers[1].lat, centers[1].lon])
+    .addTo(map)
+    .bindPopup(`<b>${centers[1].name}</b><br>Radius: ${centers[1].radius} km`);
+  
+  schoolMarkers.push(sarasvatiMarker, govtMarker);
+  
+  // Add radius circles
+  L.circle([centers[0].lat, centers[0].lon], {
+    color: 'red',
+    fillColor: '#ff0000',
+    fillOpacity: 0.1,
+    radius: centers[0].radius * 1000
+  }).addTo(map);
+  
+  L.circle([centers[1].lat, centers[1].lon], {
+    color: 'pink',
+    fillColor: '#ff69b4',
+    fillOpacity: 0.1,
+    radius: centers[1].radius * 1000
+  }).addTo(map);
+  
+  // Add legend
+  const legend = L.control({position: 'bottomright'});
+  legend.onAdd = function(map) {
+    const div = L.DomUtil.create('div', 'map-legend');
+    div.innerHTML = `
+      <div class="legend-item"><div class="legend-color" style="background-color:green"></div>User Path</div>
+      <div class="legend-item"><div class="legend-color" style="background-color:red"></div>Sarasvati School Route</div>
+      <div class="legend-item"><div class="legend-color" style="background-color:pink"></div>Government School Route</div>
+    `;
+    return div;
+  };
+  legend.addTo(map);
+}
+
+function updateUserMarker(lat, lon, accuracy) {
+  if (!map) return;
+  
+  // Remove existing user marker
+  if (userMarker) {
+    map.removeLayer(userMarker);
+  }
+  
+  // Add new user marker with accuracy circle
+  userMarker = L.marker([lat, lon])
+    .addTo(map)
+    .bindPopup(`<b>Your Location</b><br>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}`)
+    .openPopup();
+  
+  // Add accuracy circle
+  if (accuracy) {
+    L.circle([lat, lon], {
+      color: 'green',
+      fillColor: '#00ff00',
+      fillOpacity: 0.2,
+      radius: accuracy
+    }).addTo(map);
+  }
+  
+  // Update user path
+  if (liveTracking) {
+    if (!userPath) {
+      userPath = L.polyline([[lat, lon]], {color: 'green', weight: 5}).addTo(map);
+    } else {
+      const currentPath = userPath.getLatLngs();
+      currentPath.push([lat, lon]);
+      userPath.setLatLngs(currentPath);
+    }
+  }
+  
+  // Update map view to show user and schools
+  const bounds = L.latLngBounds([[lat, lon]]);
+  schoolMarkers.forEach(marker => {
+    bounds.extend(marker.getLatLng());
+  });
+  map.fitBounds(bounds, { padding: [20, 20] });
+}
+
+async function updateRoutes(lat, lon) {
+  if (!map) return;
+  
+  // Remove existing routes
+  routeLayers.forEach(layer => {
+    map.removeLayer(layer);
+  });
+  routeLayers = [];
+  
+  // Add routes to each school with different colors
+  for (let i = 0; i < centers.length; i++) {
+    const center = centers[i];
+    const geometry = await getRouteGeometry(lat, lon, center.lat, center.lon);
+    
+    if (geometry) {
+      const routeColor = i === 0 ? 'red' : 'pink';
+      const routeLayer = L.geoJSON(geometry, {
+        style: {
+          color: routeColor,
+          weight: 4,
+          opacity: 0.7
+        }
+      }).addTo(map);
+      
+      routeLayers.push(routeLayer);
+    }
+  }
+}
+
+function toggleMap() {
+  if (mapContainer.style.display === 'none') {
+    mapContainer.style.display = 'block';
+    mapToggle.textContent = '🗺️ Hide Live Map';
+    mapToggle.classList.add('hide');
+    
+    if (!map) {
+      initMap();
+    }
+    
+    if (userLat && userLon) {
+      updateUserMarker(userLat, userLon, bestAccuracy);
+      updateRoutes(userLat, userLon);
+    }
+    
+    // Start live tracking if GPS is active
+    if (liveTracking) {
+      startMapTracking();
+    }
+  } else {
+    mapContainer.style.display = 'none';
+    mapToggle.textContent = '🗺️ Show Live Map';
+    mapToggle.classList.remove('hide');
+    
+    // Stop live tracking
+    if (mapWatchId !== null) {
+      navigator.geolocation.clearWatch(mapWatchId);
+      mapWatchId = null;
+    }
+  }
+}
+
+function startMapTracking() {
+  if (!navigator.geolocation || !map) return;
+  
+  if (mapWatchId !== null) {
+    navigator.geolocation.clearWatch(mapWatchId);
+  }
+  
+  mapWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy;
+      
+      updateUserMarker(lat, lon, accuracy);
+      updateRoutes(lat, lon);
+      
+      // Update user coordinates display
+      userCoordsEl.textContent = `Latitude: ${lat.toFixed(6)}, Longitude: ${lon.toFixed(6)}`;
+    },
+    err => {
+      console.error('Map tracking error:', err);
+    },
+    { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+  );
+}
+
+// --- 5 Second Optimized GPS ---
+btnUseCurrent.addEventListener('click', ()=>{
+  statusEl.textContent='📡 GPS से location ली जा रही है...';
+  gpsLoadingEl.style.display = 'inline-block';
+  gpsAccuracyEl.style.display = 'block';
+
+  if(!navigator.geolocation){
+    statusEl.textContent='❌ Browser geolocation supported नहीं है। कृपया manual location set करें।';
+    gpsLoadingEl.style.display = 'none';
+    highlightManual();
+    return;
+  }
+
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  bestAccuracy = Infinity;
+  bestCoords = null;
+
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      const accuracy = pos.coords.accuracy;
+
+      // Better accuracy filter
+      if (accuracy < bestAccuracy) {
+        bestAccuracy = accuracy;
+        bestCoords = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: accuracy
         };
-        routeLayers[i].addData(line);
       }
 
-    } catch (e){
-      console.error('route update error', e);
-      document.getElementById('debug').textContent = 'Route error: '+e;
+      accuracyValueEl.textContent = `±${accuracy.toFixed(1)} meters`;
+      accuracyValueEl.className = '';
+      if (accuracy <= 3) {
+        accuracyValueEl.classList.add('accuracy-high');
+        accuracyBarEl.style.width = '100%';
+      } else if (accuracy <= 10) {
+        accuracyValueEl.classList.add('accuracy-medium');
+        accuracyBarEl.style.width = '80%';
+      } else {
+        accuracyValueEl.classList.add('accuracy-low');
+        accuracyBarEl.style.width = '50%';
+      }
+    },
+    err => {
+      statusEl.textContent='❌ GPS error: '+err.message+' — कृपया manual location set करें।';
+      gpsLoadingEl.style.display = 'none';
+      highlightManual();
+    },
+    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+  );
+
+  // Stop after 5 seconds
+  setTimeout(() => {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      gpsLoadingEl.style.display = 'none';
+      if (bestCoords) {
+        userLat = bestCoords.latitude;
+        userLon = bestCoords.longitude;
+        statusEl.textContent='✅ GPS location set (5s optimized).';
+        accuracyValueEl.textContent = `±${bestAccuracy.toFixed(1)} meters`;
+        userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
+        debugEl.textContent=`Final coords: ${userLat}, ${userLon}, Accuracy: ${bestAccuracy.toFixed(1)}m`;
+        
+        // Enable live tracking
+        liveTracking = true;
+        
+        // Update map if visible
+        if (mapContainer.style.display !== 'none') {
+          updateUserMarker(userLat, userLon, bestAccuracy);
+          updateRoutes(userLat, userLon);
+          startMapTracking();
+        }
+      } else {
+        statusEl.textContent='❌ 5 seconds में location नहीं मिली। कृपया manual set करें।';
+        highlightManual();
+      }
     }
-  }
+  }, 5000);
+});
 
-  // optionally zoom to show user + both centers
-  if (document.getElementById('followUser').checked){
-    try {
-      const groupCoords = [
-        [userLat, userLon],
-        [centers[0].lat, centers[0].lon],
-        [centers[1].lat, centers[1].lon]
-      ];
-      const bounds = L.latLngBounds(groupCoords);
-      map.fitBounds(bounds.pad(0.25), { maxZoom: 17, animate: true });
-    } catch(e){}
-  }
+// Highlight manual input
+function highlightManual(){
+  document.getElementById('manualInputs').style.border='2px dashed red';
+  manualStatus.textContent='👉 GPS fail हुआ, कृपया यहां Latitude और Longitude डालें।';
+  window.scrollTo({top: document.getElementById('manualInputs').offsetTop-20, behavior:'smooth'});
 }
 
-/* --- Update user marker & UI --- */
-function updateUserPosition(lat,lon,accuracy){
-  lastPos = { lat, lon, accuracy };
-  userMarker.setLatLng([lat,lon]);
-  userMarker.setOpacity(1);
-  userMarker.bindPopup(`You: ${toFixedCoords(lat)}, ${toFixedCoords(lon)} <br>Acc: ${Math.round(accuracy)} m`);
-  accuracyCircle.setLatLng([lat,lon]);
-  accuracyCircle.setRadius(Math.max(accuracy, 8));
-  document.getElementById('posInfo').textContent = `Latitude: ${toFixedCoords(lat)}, Longitude: ${toFixedCoords(lon)}`;
-  document.getElementById('accVal').textContent = `${Math.round(accuracy)}`;
-  document.getElementById('accuracyInfo').style.display = 'block';
-  document.getElementById('debug').textContent = `Last pos: ${JSON.stringify(lastPos,null,2)}`;
-
-  // update routes + distances (debounced inside)
-  updateRoutesAndDistances(lat,lon);
-}
-
-/* --- Start / Stop geolocation watch --- */
-function startWatch(){
-  if (!navigator.geolocation){
-    alert('Browser geolocation supported nahi hai. Manual set karo.');
+// Manual location set
+btnManualSet.addEventListener('click', ()=>{
+  const lat=parseFloat(document.getElementById('manualLat').value);
+  const lon=parseFloat(document.getElementById('manualLon').value);
+  if(isNaN(lat)||isNaN(lon)){
+    manualStatus.textContent='❌ Invalid input!';
     return;
   }
-  if (watchId !== null) return;
-
-  // set UI
-  document.getElementById('statusSmall').textContent = 'Tracking... (moving marker will update routes)';
-  document.getElementById('btnStart').style.display = 'none';
-  document.getElementById('btnStop').style.display = 'inline-block';
-
-  // use watchPosition for live updates
-  watchId = navigator.geolocation.watchPosition(async (pos)=>{
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
-    const acc = pos.coords.accuracy ?? 50;
-
-    updateUserPosition(lat,lon,acc);
-
-    // small map follow
-    if (document.getElementById('followUser').checked){
-      map.panTo([lat,lon], { animate:true, duration: 0.5 });
-    }
-
-  }, (err)=>{
-    console.error('geo error', err);
-    document.getElementById('statusSmall').textContent = 'GPS error: '+err.message;
-    // keep watchId false; caller can use manual
-  }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
-}
-
-function stopWatch(){
-  if (watchId !== null){
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
+  userLat=lat; userLon=lon;
+  manualStatus.textContent='✅ Manual location set हो गई।';
+  statusEl.textContent='✅ Manual location set.';
+  userCoordsEl.textContent=`Latitude: ${userLat.toFixed(6)}, Longitude: ${userLon.toFixed(6)}`;
+  debugEl.textContent=`User coords: ${userLat}, ${userLon}`;
+  gpsAccuracyEl.style.display='none';
+  
+  // Disable live tracking for manual locations
+  liveTracking = false;
+  
+  // Update map if visible
+  if (mapContainer.style.display !== 'none') {
+    updateUserMarker(userLat, userLon);
+    updateRoutes(userLat, userLon);
   }
-  document.getElementById('statusSmall').textContent = 'Tracking stopped.';
-  document.getElementById('btnStart').style.display = 'inline-block';
-  document.getElementById('btnStop').style.display = 'none';
-}
+});
 
-/* --- Manual set --- */
-function showManual(){
-  document.getElementById('manualContainer').style.display = 'flex';
-}
-function hideManual(){
-  document.getElementById('manualContainer').style.display = 'none';
-}
-function setManual(){
-  const lat = parseFloat(document.getElementById('manLat').value);
-  const lon = parseFloat(document.getElementById('manLon').value);
-  if (isNaN(lat) || isNaN(lon)){
-    alert('Valid lat/lon daalein.');
-    return;
-  }
-  // stop watch (so manual position isn't overwritten)
-  stopWatch();
-  updateUserPosition(lat,lon, 50);
-  // center map to manual
-  map.setView([lat,lon], 16);
-  hideManual();
-}
-
-/* --- Event wiring --- */
-document.getElementById('btnStart').addEventListener('click', ()=>startWatch());
-document.getElementById('btnStop').addEventListener('click', ()=>stopWatch());
-document.getElementById('btnManual').addEventListener('click', ()=>showManual());
-document.getElementById('manCancel').addEventListener('click', ()=>hideManual());
-document.getElementById('manSave').addEventListener('click', ()=>setManual());
-
-/* --- Initialize --- */
-initMap();
-document.getElementById('debug').textContent = 'Map initialized. Click Start Live Tracking or Manual Set.';
-
-/* --- Optional: On load, try 5s optimized capture (like your earlier code) THEN start watch if permission granted.
-   We'll keep it simple: only start watch when user presses Start.
-*/
-
-/* --- Final note in debug --- */
-console.log('Live School Route Tracker ready.');
-</script>
-</body>
-</html>
+// --- Check Inside (Auto meter/km format) ---
+ 
